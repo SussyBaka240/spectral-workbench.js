@@ -103,6 +103,13 @@
       margin: 0 15px;
       color: #aaa;
     }
+    /* Legend note */
+    .legend-note {
+      font-size: 0.85rem;
+      color: #ccc;
+      margin-top: 8px;
+      text-align: center;
+    }
   </style>
 
   <!--[if lt IE 9]>
@@ -278,7 +285,7 @@
         <button class="demo-button next" id="download-spectrum" onClick="$W.downloadSpectrum();">Download</button>
       </div>
 
-      <!-- step 4 Plotting phase (unchanged) -->
+      <!-- step 4 Plotting phase (enhanced for RGB lines and toggling) -->
       <div id="plotting" class="content center-content" role="tabpanel">
         Here Is the result plot
         <div class="swb-graphing center-content">
@@ -287,6 +294,9 @@
         <div id="plotting-note">
           Use the bottom graph as the navigator to zoom into any section of the plot by dragging
           to select the target region span. User could also move the span in the navigator
+        </div>
+        <div class="legend-note">
+          <i class="fa fa-info-circle"></i> Click on the legend labels to show/hide each line.
         </div>
         <button class="demo-button" id="restart" style="margin-top: 1em">Restart</button>
         <script>
@@ -320,6 +330,24 @@
 </body>
 
 <script>
+  // Helper to create a spectrum with R,G,B,Combined lines from an array of pixel objects {r,g,b}
+  function createRGBSpectrumFromPixels(pixels) {
+    var lines = pixels.map(function(pixel, idx) {
+      var r = pixel.r !== undefined ? pixel.r : pixel[0];
+      var g = pixel.g !== undefined ? pixel.g : pixel[1];
+      var b = pixel.b !== undefined ? pixel.b : pixel[2];
+      var avg = (r + g + b) / 3;
+      return {
+        pixel: idx,
+        r: r,
+        g: g,
+        b: b,
+        average: avg
+      };
+    });
+    return new SpectralWorkbench.Spectrum({ data: { lines: lines } });
+  }
+
   $(document).ready(function () {
     var stepper = new Stepper($('.bs-stepper')[0], {
       linear: false,
@@ -348,56 +376,67 @@
       stepper.to(3);
     });
 
-    var imageData;
-    $("#plot-trigger").on('click', function (params) {
-      stepper.to(4);
-      $("#capture-trigger").prop('disabled', true);
-      $("#setting-trigger").prop('disabled', true);
-      $("#landing-page-trigger").prop('disabled', true);
-
-      $W.saveSpectrum();
-      imageData = $W.full_data;
-      console.log('what is my image data like', JSON.stringify($W.full_data));
-
-      graph = new SpectralWorkbench.Graph({
-        selector: '#graph1'
-      });
-
-      var imageDataFormatted = [];
-      imageData.forEach((item, index) => {
-        var formattedItem = [index, item[item.length-1]]
-        imageDataFormatted.push(formattedItem)
-      })
-
-      var spectrum = new SpectralWorkbench.Spectrum(imageDataFormatted, graph);
-      graph.load(spectrum);
-    });
-
+    // Capture page next: build RGB spectrum from the captured row
     $("#capture-page-next").on('click', function (params) {
       stepper.to(4);
-      $("#capture-trigger").prop('disabled', true);
-      $("#setting-trigger").prop('disabled', true);
-      $("#landing-page-trigger").prop('disabled', true);
+      $("#capture-trigger, #setting-trigger, #landing-page-trigger").prop('disabled', true);
 
       $W.saveSpectrum();
-      imageData = $W.full_data;
-      console.log('what is my image data like', JSON.stringify($W.full_data));
+      var fullData = $W.full_data;
+      if (!fullData || fullData.length === 0) {
+        console.warn("No spectrum data captured");
+        return;
+      }
 
-      graph = new SpectralWorkbench.Graph({
-        selector: '#graph1'
+      // The last row in fullData is the most recent captured row
+      var lastRow = fullData[fullData.length - 1];
+      if (!lastRow || !lastRow.length) {
+        console.warn("Invalid row data");
+        return;
+      }
+
+      // Assume each element in the row is an object with r,g,b OR an array [r,g,b,avg]
+      var pixels = lastRow.map(function(pixel) {
+        if (typeof pixel === 'object' && pixel.r !== undefined) {
+          return { r: pixel.r, g: pixel.g, b: pixel.b };
+        } else if (Array.isArray(pixel) && pixel.length >= 3) {
+          return { r: pixel[0], g: pixel[1], b: pixel[2] };
+        } else {
+          // Fallback: treat as grayscale intensity (single value)
+          var val = Number(pixel);
+          return { r: val, g: val, b: val };
+        }
       });
 
-      var imageDataFormatted = [];
-      imageData.forEach((item, index) => {
-        var formattedItem = [index, item[item.length-1]]
-        imageDataFormatted.push(formattedItem)
-      })
-
-      var spectrum = new SpectralWorkbench.Spectrum(imageDataFormatted, graph); 
+      var spectrum = createRGBSpectrumFromPixels(pixels);
+      var graph = new SpectralWorkbench.Graph({ selector: '#graph1' });
       graph.load(spectrum);
     });
 
-    // ----- Image Upload Module (integrated with the flow) -----
+    // Plot trigger (in case user clicks directly)
+    $("#plot-trigger").on('click', function (params) {
+      stepper.to(4);
+      if ($W.full_data && $W.full_data.length) {
+        var lastRow = $W.full_data[$W.full_data.length - 1];
+        if (lastRow && lastRow.length) {
+          var pixels = lastRow.map(function(pixel) {
+            if (typeof pixel === 'object' && pixel.r !== undefined) {
+              return { r: pixel.r, g: pixel.g, b: pixel.b };
+            } else if (Array.isArray(pixel) && pixel.length >= 3) {
+              return { r: pixel[0], g: pixel[1], b: pixel[2] };
+            } else {
+              var val = Number(pixel);
+              return { r: val, g: val, b: val };
+            }
+          });
+          var spectrum = createRGBSpectrumFromPixels(pixels);
+          var graph = new SpectralWorkbench.Graph({ selector: '#graph1' });
+          graph.load(spectrum);
+        }
+      }
+    });
+
+    // ----- Image Upload Module (already produces RGB spectrum) -----
     let currentImage = null;
     let selectedRow = null;
     let previewCanvas = document.getElementById('uploadPreviewCanvas');
@@ -469,30 +508,16 @@
       let scaleY = currentImage.height / previewCanvas.height;
       let originalRow = Math.floor(selectedRow * scaleY);
       originalRow = Math.min(originalRow, currentImage.height - 1);
-      let rgbData = [];
+      let pixels = [];
       for (let x = 0; x < currentImage.width; x++) {
         let pixel = offCtx.getImageData(x, originalRow, 1, 1).data;
-        rgbData.push({ r: pixel[0], g: pixel[1], b: pixel[2] });
+        pixels.push({ r: pixel[0], g: pixel[1], b: pixel[2] });
       }
 
-      // Build a spectrum object with lines containing r,g,b,average
-      let lines = rgbData.map((pixel, idx) => {
-        let avg = (pixel.r + pixel.g + pixel.b) / 3;
-        return {
-          pixel: idx,
-          r: pixel.r,
-          g: pixel.g,
-          b: pixel.b,
-          average: avg
-        };
-      });
-      let spectrum = new SpectralWorkbench.Spectrum({ data: { lines: lines } });
-
+      let spectrum = createRGBSpectrumFromPixels(pixels);
       // Navigate to plotting step and load the graph
       stepper.to(4);
-      // Disable the webcam steps to avoid confusion
       $("#capture-trigger, #setting-trigger, #landing-page-trigger").prop('disabled', true);
-      // Clear previous graph content
       $('#graph1').empty();
       let graph = new SpectralWorkbench.Graph({ selector: '#graph1' });
       graph.load(spectrum);
