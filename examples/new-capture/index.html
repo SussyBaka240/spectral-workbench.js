@@ -12,7 +12,7 @@
   <link rel="apple-touch-fa-precomposed apple-touch-icon" href="//spectralworkbench.org/images/spectral-workbench-256.png">
   <link rel="shortcut icon" href="//spectralworkbench.org/images/spectral-workbench-256.png" />
 
-  <!-- CSS: CDN replacements for local node_modules -->
+  <!-- CSS: CDN replacements -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bs-stepper/dist/css/bs-stepper.min.css">
@@ -36,7 +36,7 @@
   <script src="../../dist/capture.dist.js" type="text/javascript"></script>
   <script src="../capture/api.js" type="text/javascript"></script>
 
-  <!-- Additional libraries from CDN (d3, nvd3, moment) -->
+  <!-- Additional libraries from CDN -->
   <script src="https://d3js.org/d3.v3.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/nvd3/1.8.6/nv.d3.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
@@ -50,7 +50,7 @@
   <link href="new-capture.css" media="all" rel="stylesheet" type="text/css" />
 
   <style>
-    /* Image upload card styling (matches original theme) */
+    /* Upload card styling */
     .upload-card {
       background: #2c2c2c;
       border-radius: 8px;
@@ -103,12 +103,18 @@
       margin: 0 15px;
       color: #aaa;
     }
-    /* Legend note */
     .legend-note {
       font-size: 0.85rem;
       color: #ccc;
       margin-top: 8px;
       text-align: center;
+    }
+    /* Make nvd3 legend visible on dark background */
+    .nvd3 .nv-legend .nv-series {
+      fill: #eee !important;
+    }
+    .nvd3 .nv-legend text {
+      fill: #eee !important;
     }
   </style>
 
@@ -146,7 +152,7 @@
     </div>
 
     <div class="capture full-strecth-block bs-stepper-content" id="main-content">
-      <!-- step 0 landing Page with Upload Card -->
+      <!-- Landing Page -->
       <div id="landing-page" class="full-strecth-flex-vertical content" role="tabpanel">
         <div id="landing-page-content">
           <h1> 
@@ -161,7 +167,7 @@
           </p>
           <br><br><br>
 
-          <!-- Image Upload Card -->
+          <!-- Upload Card -->
           <div class="upload-card">
             <h4><i class="fa fa-upload"></i> Upload an Image</h4>
             <p>Analyze a spectrum from your own image file (JPEG/PNG). Click on the preview to set the sample row (yellow bar).</p>
@@ -194,7 +200,7 @@
         </div>
       </div>
 
-      <!-- step 2 setup (unchanged) -->
+      <!-- Settings (unchanged) -->
       <div id="settings" class="content" role="tabpanel">
         <div class="full-strecth-flex-vertical center-content">
           <div id="webcam-msg"><p><b>Requesting camera access... <br />(<a href="https://play.google.com/store/apps/details?id=org.mozilla.firefox">Firefox</a>, <a href="https://play.google.com/store/apps/details?id=com.opera.browser">Opera</a> or Chrome on Android, or <a href="https://itunes.apple.com/us/app/bowser/id560478358">Bowser</a> on iOS). Please click "Allow" when prompted, or try the <a href="/upload">Upload interface</a>.</b></p></div>
@@ -235,7 +241,7 @@
         </div>
       </div>
 
-      <!-- step 3 capturing phase (unchanged) -->
+      <!-- Capture (unchanged) -->
       <div id="capture" class="content center-content" role="tabpanel">
         <div class="full-strecth-flex-horizontal center-content">
           <div style="width: 28em; margin-right: 1em">
@@ -285,7 +291,7 @@
         <button class="demo-button next" id="download-spectrum" onClick="$W.downloadSpectrum();">Download</button>
       </div>
 
-      <!-- step 4 Plotting phase (enhanced for RGB lines and toggling) -->
+      <!-- Plotting (enhanced) -->
       <div id="plotting" class="content center-content" role="tabpanel">
         Here Is the result plot
         <div class="swb-graphing center-content">
@@ -311,6 +317,7 @@
   </div>
 
   <script>
+    // Initialize webcam
     (function() {
       $W.initialize({
         calibrated: false,
@@ -330,19 +337,19 @@
 </body>
 
 <script>
-  // Helper to create a spectrum with R,G,B,Combined lines from an array of pixel objects {r,g,b}
-  function createRGBSpectrumFromPixels(pixels) {
+  // Helper: create spectrum from an array of pixel objects {r,g,b}
+  function createRGBSpectrum(pixels) {
     var lines = pixels.map(function(pixel, idx) {
-      var r = pixel.r !== undefined ? pixel.r : pixel[0];
-      var g = pixel.g !== undefined ? pixel.g : pixel[1];
-      var b = pixel.b !== undefined ? pixel.b : pixel[2];
+      var r = pixel.r;
+      var g = pixel.g;
+      var b = pixel.b;
       var avg = (r + g + b) / 3;
       return {
         pixel: idx,
-        r: r,
-        g: g,
-        b: b,
-        average: avg
+        R: r,
+        G: g,
+        B: b,
+        Combined: avg
       };
     });
     return new SpectralWorkbench.Spectrum({ data: { lines: lines } });
@@ -358,85 +365,67 @@
         stepper: '.bs-stepper'
       }
     });
-    $("#landing-page-trigger").on('click', function (params) {
-      stepper.to(1);
-    });
-    $("#landing-page-next").on('click', function (params) {
-      stepper.to(2);
-    });
 
-    $("#setting-trigger").on('click', function (params) {
-      stepper.to(2);
-    });
-    $("#setting-page-next").on('click', function (params) {
-      stepper.to(3);
-    });
+    // Navigation
+    $("#landing-page-trigger").on('click', function () { stepper.to(1); });
+    $("#landing-page-next").on('click', function () { stepper.to(2); });
+    $("#setting-trigger").on('click', function () { stepper.to(2); });
+    $("#setting-page-next").on('click', function () { stepper.to(3); });
+    $("#capture-trigger").on('click', function () { stepper.to(3); });
 
-    $("#capture-trigger").on('click', function (params) {
-      stepper.to(3);
-    });
-
-    // Capture page next: build RGB spectrum from the captured row
-    $("#capture-page-next").on('click', function (params) {
+    // Capture page next: get captured row data
+    $("#capture-page-next").on('click', function () {
       stepper.to(4);
       $("#capture-trigger, #setting-trigger, #landing-page-trigger").prop('disabled', true);
 
       $W.saveSpectrum();
-      var fullData = $W.full_data;
-      if (!fullData || fullData.length === 0) {
+      var rowData = $W.full_data; // This should be an array of pixel values, each is [r,g,b,average]?
+      if (!rowData || !rowData.length) {
         console.warn("No spectrum data captured");
         return;
       }
 
-      // The last row in fullData is the most recent captured row
-      var lastRow = fullData[fullData.length - 1];
-      if (!lastRow || !lastRow.length) {
-        console.warn("Invalid row data");
-        return;
-      }
-
-      // Assume each element in the row is an object with r,g,b OR an array [r,g,b,avg]
-      var pixels = lastRow.map(function(pixel) {
-        if (typeof pixel === 'object' && pixel.r !== undefined) {
-          return { r: pixel.r, g: pixel.g, b: pixel.b };
-        } else if (Array.isArray(pixel) && pixel.length >= 3) {
+      // Convert rowData to array of {r,g,b}
+      var pixels = rowData.map(function(pixel) {
+        if (Array.isArray(pixel) && pixel.length >= 3) {
           return { r: pixel[0], g: pixel[1], b: pixel[2] };
+        } else if (typeof pixel === 'object' && pixel.r !== undefined) {
+          return { r: pixel.r, g: pixel.g, b: pixel.b };
         } else {
-          // Fallback: treat as grayscale intensity (single value)
           var val = Number(pixel);
           return { r: val, g: val, b: val };
         }
       });
 
-      var spectrum = createRGBSpectrumFromPixels(pixels);
+      var spectrum = createRGBSpectrum(pixels);
+      $('#graph1').empty();
       var graph = new SpectralWorkbench.Graph({ selector: '#graph1' });
       graph.load(spectrum);
     });
 
-    // Plot trigger (in case user clicks directly)
-    $("#plot-trigger").on('click', function (params) {
+    // Plot trigger (when user clicks plotting step manually)
+    $("#plot-trigger").on('click', function () {
       stepper.to(4);
       if ($W.full_data && $W.full_data.length) {
-        var lastRow = $W.full_data[$W.full_data.length - 1];
-        if (lastRow && lastRow.length) {
-          var pixels = lastRow.map(function(pixel) {
-            if (typeof pixel === 'object' && pixel.r !== undefined) {
-              return { r: pixel.r, g: pixel.g, b: pixel.b };
-            } else if (Array.isArray(pixel) && pixel.length >= 3) {
-              return { r: pixel[0], g: pixel[1], b: pixel[2] };
-            } else {
-              var val = Number(pixel);
-              return { r: val, g: val, b: val };
-            }
-          });
-          var spectrum = createRGBSpectrumFromPixels(pixels);
-          var graph = new SpectralWorkbench.Graph({ selector: '#graph1' });
-          graph.load(spectrum);
-        }
+        var rowData = $W.full_data;
+        var pixels = rowData.map(function(pixel) {
+          if (Array.isArray(pixel) && pixel.length >= 3) {
+            return { r: pixel[0], g: pixel[1], b: pixel[2] };
+          } else if (typeof pixel === 'object' && pixel.r !== undefined) {
+            return { r: pixel.r, g: pixel.g, b: pixel.b };
+          } else {
+            var val = Number(pixel);
+            return { r: val, g: val, b: val };
+          }
+        });
+        var spectrum = createRGBSpectrum(pixels);
+        $('#graph1').empty();
+        var graph = new SpectralWorkbench.Graph({ selector: '#graph1' });
+        graph.load(spectrum);
       }
     });
 
-    // ----- Image Upload Module (already produces RGB spectrum) -----
+    // ----- Image Upload Module (already working) -----
     let currentImage = null;
     let selectedRow = null;
     let previewCanvas = document.getElementById('uploadPreviewCanvas');
@@ -514,14 +503,13 @@
         pixels.push({ r: pixel[0], g: pixel[1], b: pixel[2] });
       }
 
-      let spectrum = createRGBSpectrumFromPixels(pixels);
-      // Navigate to plotting step and load the graph
+      let spectrum = createRGBSpectrum(pixels);
       stepper.to(4);
       $("#capture-trigger, #setting-trigger, #landing-page-trigger").prop('disabled', true);
       $('#graph1').empty();
       let graph = new SpectralWorkbench.Graph({ selector: '#graph1' });
       graph.load(spectrum);
     });
-  })
+  });
 </script>
 </html>
