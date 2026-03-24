@@ -7,36 +7,52 @@
   <meta name="description" content="Open source spectral analysis – capture from webcam or upload an image">
   <meta name="author" content="Public Lab contributors">
 
-  <!-- Favicon (fallback) -->
+  <!-- Favicon fallback -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%232c6e9e'/%3E%3Ctext x='50' y='67' font-size='50' text-anchor='middle' fill='white'%3ESW%3C/text%3E%3C/svg%3E">
 
-  <!-- Stylesheets (CDNs + local) -->
-  <link rel="stylesheet" href="../../node_modules/font-awesome/css/font-awesome.min.css">
-  <link rel="stylesheet" href="../../node_modules/bootstrap/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="../../node_modules/nvd3/build/nv.d3.css">
-  <link rel="stylesheet" href="../../dist/spectral-workbench.css">
-  <link rel="stylesheet" href="new-capture.css">
+  <!-- ========== THIRD‑PARTY CSS (CDNs) ========== -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bs-stepper/dist/css/bs-stepper.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nvd3/1.8.6/nv.d3.min.css">
 
-  <!-- JavaScript dependencies – must be in correct order -->
-  <script src="../../node_modules/jquery/dist/jquery.min.js"></script>
-  <script src="../../node_modules/flot/jquery.flot.js"></script>
-  <script src="../../node_modules/flot/jquery.flot.crosshair.js"></script>
-  <script src="../../node_modules/flot/jquery.flot.threshold.js"></script>
-  <script src="../../node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
-  <script src="../../node_modules/d3/d3.js"></script>
-  <script src="../../node_modules/nvd3/build/nv.d3.js"></script>
-  <script src="../../node_modules/moment/moment.js"></script>
+  <!-- ========== LOCAL CSS (from your repo) ========== -->
+  <link href="../../dist/spectral-workbench.css" rel="stylesheet">
+  <link href="new-capture.css" media="all" rel="stylesheet" type="text/css">
+
+  <!-- ========== THIRD‑PARTY JS (CDNs, in correct order) ========== -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.crosshair.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.threshold.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bs-stepper/dist/js/bs-stepper.min.js"></script>
+  <script src="https://d3js.org/d3.v3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nvd3/1.8.6/nv.d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
   <script src="https://cdn.temasys.io/adapterjs/0.15.x/adapter.min.js"></script>
 
-  <!-- Spectral Workbench custom scripts (must be after dependencies) -->
-  <script src="../../dist/spectral-workbench.js"></script>
-  <script src="../capture/capture.js"></script>
-  <script src="../capture/graph.js"></script>
-  <script src="../capture/api.js"></script>
-  <script src="../../dist/capture.dist.js"></script>
+  <!-- ========== LOCAL SCRIPTS (from your repo) ========== -->
+  <script src="../capture/graph.js" type="text/javascript"></script>
+  <script src="../capture/capture.js" type="text/javascript"></script>
+  <script src="../../dist/capture.dist.js" type="text/javascript"></script>
+  <script src="../capture/api.js" type="text/javascript"></script>
+  <script src="../../dist/spectral-workbench.js" type="text/javascript"></script>
 
   <style>
-    /* Additional styling for image upload – matches the dark theme */
+    /* Fix white-on-white buttons */
+    .btn-default, .btn-primary, .btn {
+      color: #eee !important;
+    }
+    .btn-default {
+      background-color: #3c3c3c;
+      border-color: #555;
+    }
+    .btn-default:hover {
+      background-color: #2c6e9e;
+    }
+
+    /* Image upload card styling (matching dark theme) */
     .upload-card {
       background: #2c2c2c;
       border-radius: 8px;
@@ -100,17 +116,6 @@
     .upload-section-divider span {
       margin: 0 15px;
       color: #aaa;
-    }
-    /* fix white-on-white buttons in original */
-    .btn-default, .btn-primary, .btn {
-      color: #eee !important;
-    }
-    .btn-default {
-      background-color: #3c3c3c;
-      border-color: #555;
-    }
-    .btn-default:hover {
-      background-color: #2c6e9e;
     }
   </style>
 </head>
@@ -215,7 +220,7 @@
       </div>
     </div>
 
-    <!-- Step 3: Capture Phase (unchanged, but will work correctly now) -->
+    <!-- Step 3: Capture Phase (unchanged) -->
     <div id="capture" class="content center-content" role="tabpanel">
       <div class="full-strecth-flex-horizontal center-content">
         <div style="width: 28em; margin-right: 1em">
@@ -264,8 +269,9 @@
 </div>
 
 <script>
-  // Initialize the stepper
+  // Wait for DOM and all custom scripts to be ready
   $(document).ready(function () {
+    // Initialize stepper
     var stepper = new Stepper($('.bs-stepper')[0], {
       linear: false,
       animation: true,
