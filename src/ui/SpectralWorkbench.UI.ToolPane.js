@@ -73,6 +73,7 @@ SpectralWorkbench.UI.ToolPane = Class.extend({
       form.applyEl.click(function(e) {
         form.applyEl.html("<i class='fa fa-spinner fa-spin fa-white'></i>");
         _tool.options.onApply.bind(this)(form);
+        form.close();
       });
     }
 
