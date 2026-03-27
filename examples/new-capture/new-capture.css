@@ -204,7 +204,6 @@ div.bs-stepper-content {
   padding: 0 25rem;
   margin: 0 auto;
   margin-top: 4rem;
-  position: absolute;
   z-index: 100;
 }
 #stepper .dotted-line {
