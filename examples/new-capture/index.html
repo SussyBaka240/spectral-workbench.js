@@ -315,8 +315,10 @@
   </div>
 
   <script>
-    // Initialize webcam
-    (function() {
+    // Initialize webcam only when needed
+    window.webcamStarted = false;
+    window.startWebcam = function() {
+      if (window.webcamStarted) return;
       $W.initialize({
         calibrated: false,
         interface:"capture",
@@ -330,7 +332,8 @@
 
       if ($('body').width() > 768) $('#tool-toggle').hide()
       else $('#tool-pane').hide()
-    })();
+      window.webcamStarted = true;
+    };
   </script>
 </body>
 
@@ -366,8 +369,14 @@
 
     // Navigation
     $("#landing-page-trigger").on('click', function () { stepper.to(1); });
-    $("#landing-page-next").on('click', function () { stepper.to(2); });
-    $("#setting-trigger").on('click', function () { stepper.to(2); });
+    $("#landing-page-next").on('click', function () {
+      stepper.to(2);
+      startWebcam();
+    });
+    $("#setting-trigger").on('click', function () {
+      stepper.to(2);
+      startWebcam();
+    });
     $("#setting-page-next").on('click', function () { stepper.to(3); });
     $("#capture-trigger").on('click', function () { stepper.to(3); });
 

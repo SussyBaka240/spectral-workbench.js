@@ -166,6 +166,9 @@ SpectralWorkbench.Spectrum = SpectralWorkbench.Datum.extend({
         var wavelength = (typeof _spectrum.average[i].x !== 'undefined' && _spectrum.isCalibrated()) ? _spectrum.average[i].x : "";
         var pixel = _spectrum.isCalibrated() ? i : _spectrum.average[i].x; // if not calibrated, x is pixel
 
+        // If uncalibrated, wavelength is unknown, but we should ensure it's handled gracefully.
+        // User asked if it's meant to be empty. Yes, if uncalibrated.
+
         var row = [
           wavelength,
           pixel,

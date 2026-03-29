@@ -313,7 +313,7 @@ SpectralWorkbench.Graph = Class.extend({
     _graph.zoom = function() {
 
       _graph.zooming = !_graph.zooming;
-      $('.nv-context').toggle();
+      $(_graph.selector + ' .nv-context').toggle();
       _graph.updateSize()();
 
     }
@@ -431,7 +431,7 @@ SpectralWorkbench.Graph = Class.extend({
 
     _graph.chart = nv.models.lineWithFocusChart() // this sets up zooming behavior
                      .options({ useVoronoi: false })
-                     .height(_graph.height - _graph.margin.top - _graph.margin.bottom + 100) // 100 for zoom brush pane, hidden by default
+                     .height(_graph.height)
                      .margin(_graph.margin)
                      .showLegend(false)       //Show the legend, allowing users to turn on/off line series.
     ;
@@ -557,10 +557,12 @@ SpectralWorkbench.Graph = Class.extend({
       _graph.height = _graph.height - _graph.margin.top  - _graph.margin.bottom;
 
       // make space for the zoom brushing pane
-      if (_graph.zooming) _graph.height += 100;
+      var chartHeight = _graph.height;
+      if (_graph.zooming) chartHeight += 100;
 
-      $(_graph.selector).height(_graph.height + _graph.margin.top + _graph.margin.bottom)
-      if (_graph.svg) _graph.svg.attr("height", _graph.height + _graph.margin.top + _graph.margin.bottom);
+      $(_graph.selector).height(chartHeight + _graph.margin.top + _graph.margin.bottom)
+      if (_graph.svg) _graph.svg.attr("height", chartHeight + _graph.margin.top + _graph.margin.bottom);
+      if (_graph.chart) _graph.chart.height(chartHeight);
 
       _graph.width  = _graph.width  
                     - _graph.margin.left 
