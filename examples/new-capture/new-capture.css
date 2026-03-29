@@ -253,18 +253,20 @@ div.bs-stepper-content {
 
 #plotting > div:first-child {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1200px;
 }
 
 #plotting-note {
   background: #dedede;
-  max-width: 300px;
+  max-width: 600px;
   padding: 1.5rem;
   border-radius: 5px;
+  text-align: center;
 }
 
 #graph1 {
-  height: 300px !important;
+  height: 500px !important;
+  width: 100%;
 }
 
 

@@ -432,10 +432,19 @@ SpectralWorkbench.Datum = Class.extend({
      */
     _datum.downloadCSV = function(selector) {
 
-      $(selector).click(function() {
+      $(selector).click(function(e) {
 
-        $(this).attr('download','spectralwb-' + _datum.id + '.csv')
-               .attr('href','data:application/csv;utf8,'+encodeURIComponent(_datum.encodeFullCSV()));
+        var csvContent = _datum.encodeFullCSV();
+        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+
+        link.setAttribute("href", url);
+        link.setAttribute("download", 'spectralwb-' + _datum.id + '.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
       });
 
@@ -448,7 +457,11 @@ SpectralWorkbench.Datum = Class.extend({
      */
     _datum.getJSON = function() {
 
-      return _datum.json.data.lines;
+      if (_datum.json && _datum.json.data && _datum.json.data.lines) {
+        return _datum.json.data.lines;
+      } else {
+        return _datum.encodeJSON();
+      }
 
     }
 
@@ -973,7 +986,7 @@ SpectralWorkbench.Spectrum = SpectralWorkbench.Datum.extend({
       lines.push(header);
 
       _spectrum.average.forEach(function(line, i) {
-        var wavelength = _spectrum.isCalibrated() ? _spectrum.average[i].x : "";
+        var wavelength = (typeof _spectrum.average[i].x !== 'undefined' && _spectrum.isCalibrated()) ? _spectrum.average[i].x : "";
         var pixel = _spectrum.isCalibrated() ? i : _spectrum.average[i].x; // if not calibrated, x is pixel
 
         var row = [

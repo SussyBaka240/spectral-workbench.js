@@ -163,7 +163,7 @@ SpectralWorkbench.Spectrum = SpectralWorkbench.Datum.extend({
       lines.push(header);
 
       _spectrum.average.forEach(function(line, i) {
-        var wavelength = _spectrum.isCalibrated() ? _spectrum.average[i].x : "";
+        var wavelength = (typeof _spectrum.average[i].x !== 'undefined' && _spectrum.isCalibrated()) ? _spectrum.average[i].x : "";
         var pixel = _spectrum.isCalibrated() ? i : _spectrum.average[i].x; // if not calibrated, x is pixel
 
         var row = [
