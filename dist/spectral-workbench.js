@@ -294,8 +294,8 @@ SpectralWorkbench.Image = Class.extend({
         var svg = '<svg class="section-line-svg" style="position:absolute;top:0;left:0;width:100%;height:' + height + 'px;pointer-events:none;z-index:10;">' +
                   '  <line class="section-line" x1="0" y1="0" x2="100%" y2="0" stroke="rgba(255,255,255,0.8)" stroke-width="2" />' +
                   '  <text class="section-line-text" x="100%" y="0" dy="-5" text-anchor="end" fill="rgba(255,255,255,0.8)" style="font-size:9px;"></text>' +
-                  '  <circle class="handle handle-1" cx="0" cy="0" r="7" fill="rgba(255,0,0,0.7)" style="pointer-events:all; cursor:move; display:none;" />' +
-                  '  <circle class="handle handle-2" cx="100%" cy="0" r="7" fill="rgba(255,0,0,0.7)" style="pointer-events:all; cursor:move; display:none;" />' +
+                  '  <circle class="handle handle-1" cx="0" cy="0" r="8" fill="rgba(255,0,0,0.8)" stroke="white" stroke-width="2" style="pointer-events:all; cursor:move; display:none;" />' +
+                  '  <circle class="handle handle-2" cx="100%" cy="0" r="8" fill="rgba(255,0,0,0.8)" stroke="white" stroke-width="2" style="pointer-events:all; cursor:move; display:none;" />' +
                   '</svg>';
         image.el.before($(svg));
         image.lineSvgEl = image.container.find('.section-line-svg');
@@ -311,8 +311,11 @@ SpectralWorkbench.Image = Class.extend({
 
               var containerWidth = image.lineSvgEl.width();
               var containerHeight = image.lineSvgEl.height();
-              var newX = Math.max(0, Math.min(containerWidth, d3.event.x));
-              var newY = Math.max(0, Math.min(containerHeight, d3.event.y));
+
+              // Use d3.mouse for more reliable coordinates relative to the SVG
+              var mouse = d3.mouse(image.lineSvgEl[0]);
+              var newX = Math.max(0, Math.min(containerWidth, mouse[0]));
+              var newY = Math.max(0, Math.min(containerHeight, mouse[1]));
 
               var imgX = (newX / containerWidth) * image.width;
               var imgY = (newY / containerHeight) * image.height;
@@ -361,9 +364,9 @@ SpectralWorkbench.Image = Class.extend({
       image.currentCoords = { x1: x1, y1: y1, x2: x2, y2: y2 };
 
       var displayX1 = (x1 / image.width) * 100 + '%',
-          displayY1 = (y1 / image.height) * 100,
+          displayY1 = (y1 / image.height) * 100 + '%',
           displayX2 = (x2 / image.width) * 100 + '%',
-          displayY2 = (y2 / image.height) * 100;
+          displayY2 = (y2 / image.height) * 100 + '%';
 
       image.lineEl.attr('x1', displayX1)
                   .attr('y1', displayY1)
@@ -375,7 +378,7 @@ SpectralWorkbench.Image = Class.extend({
       image.handle2.attr('cx', displayX2)
                    .attr('cy', displayY2);
 
-      if (displayY1 > 20) {
+      if (y1 / image.height * 100 > 20) {
         image.lineTextEl.text('GRAPHED CROSS SECTION');
         image.lineTextEl.attr('x', displayX2)
                         .attr('y', displayY2)
