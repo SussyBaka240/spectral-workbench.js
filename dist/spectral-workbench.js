@@ -166,6 +166,7 @@ SpectralWorkbench.Image = Class.extend({
     }
 
     image.lineEl = false; // the line indicating the cross-section
+    image.currentCoords = { x1: 0, y1: 0, x2: 0, y2: 0 };
 
     image.obj.onload = function() {
 
@@ -246,25 +247,94 @@ SpectralWorkbench.Image = Class.extend({
 
 
     /* ======================================
-     * Display a horizontal line on the image, y pixels below the top edge
+     * Returns a nested array of pixels along a line between (x1, y1) and (x2, y2),
+     * each in the format of getPoint(), values from 0-255.
+     * Coordinates are in image pixels.
+     */
+    image.getLineData = function(x1, y1, x2, y2) {
+
+      var dx = x2 - x1,
+          dy = y2 - y1,
+          distance = Math.sqrt(dx * dx + dy * dy),
+          steps = Math.round(distance),
+          output = [],
+          fullData = image.ctx.getImageData(0, 0, image.width, image.height).data;
+
+      for (var i = 0; i <= steps; i++) {
+        var t = steps === 0 ? 0 : i / steps;
+        var x = Math.round(x1 + dx * t);
+        var y = Math.round(y1 + dy * t);
+
+        x = Math.max(0, Math.min(image.width - 1, x));
+        y = Math.max(0, Math.min(image.height - 1, y));
+
+        var index = (y * image.width + x) * 4;
+        output.push([
+          fullData[index],
+          fullData[index + 1],
+          fullData[index + 2],
+          fullData[index + 3]
+        ]);
+      }
+
+      return output;
+
+    }
+
+
+    /* ======================================
+     * Display a line on the image
      * (used for showing the image cross section)
      */
-    image.setupLine = function(y) {
+    image.setupLine = function() {
 
       if (_graph) {
 
-        image.el.before($('<div class="section-line-container"><div class="section-line"></div></div>'));
-        image.lineContainerEl = image.container.find('.section-line-container');
-        image.lineContainerEl.css('position', 'relative');
-        image.lineEl = image.container.find('.section-line');
-        image.lineEl.css('position', 'absolute')
-                    .css('width', '100%')
-                    .css('top', 0)
-                    .css('border-bottom', '1px solid rgba(255,255,255,0.5)')
-                    .css('font-size', '9px')
-                    .css('color', 'rgba(255,255,255,0.5)')
-                    .css('text-align', 'right')
-                    .css('padding-right', '6px')
+        var height = image.container.height() || 100;
+        var svg = '<svg class="section-line-svg" style="position:absolute;top:0;left:0;width:100%;height:' + height + 'px;pointer-events:none;z-index:10;">' +
+                  '  <line class="section-line" x1="0" y1="0" x2="100%" y2="0" stroke="rgba(255,255,255,0.8)" stroke-width="2" />' +
+                  '  <text class="section-line-text" x="100%" y="0" dy="-5" text-anchor="end" fill="rgba(255,255,255,0.8)" style="font-size:9px;"></text>' +
+                  '  <circle class="handle handle-1" cx="0" cy="0" r="7" fill="rgba(255,0,0,0.7)" style="pointer-events:all; cursor:move; display:none;" />' +
+                  '  <circle class="handle handle-2" cx="100%" cy="0" r="7" fill="rgba(255,0,0,0.7)" style="pointer-events:all; cursor:move; display:none;" />' +
+                  '</svg>';
+        image.el.before($(svg));
+        image.lineSvgEl = image.container.find('.section-line-svg');
+        image.lineEl = image.lineSvgEl.find('.section-line');
+        image.lineTextEl = image.lineSvgEl.find('.section-line-text');
+        image.handle1 = image.lineSvgEl.find('.handle-1');
+        image.handle2 = image.lineSvgEl.find('.handle-2');
+
+        if (typeof d3 !== 'undefined' && d3.behavior && d3.behavior.drag) {
+          var drag = d3.behavior.drag()
+            .on("drag", function() {
+              var isHandle1 = d3.select(this).classed('handle-1');
+
+              var containerWidth = image.lineSvgEl.width();
+              var containerHeight = image.lineSvgEl.height();
+              var newX = Math.max(0, Math.min(containerWidth, d3.event.x));
+              var newY = Math.max(0, Math.min(containerHeight, d3.event.y));
+
+              var imgX = (newX / containerWidth) * image.width;
+              var imgY = (newY / containerHeight) * image.height;
+
+              if (isHandle1) {
+                image.currentCoords.x1 = imgX;
+                image.currentCoords.y1 = imgY;
+              } else {
+                image.currentCoords.x2 = imgX;
+                image.currentCoords.y2 = imgY;
+              }
+
+              image.setLine(image.currentCoords.x1, image.currentCoords.y1, image.currentCoords.x2, image.currentCoords.y2);
+
+              if (image.onLineChange) {
+                image.onLineChange(image.currentCoords);
+              }
+            });
+
+          d3.selectAll(image.handle1.toArray()).call(drag);
+          d3.selectAll(image.handle2.toArray()).call(drag);
+        }
 
       }
 
@@ -272,34 +342,71 @@ SpectralWorkbench.Image = Class.extend({
 
 
     /* ======================================
-     * Display a horizontal line on the image, y pixels below the top edge
-     * in displace pixels. To use in image pixels, divide by image pixels and multiply
-     * by display height of element in pixels -- 100 by default.
-     * (used for showing the image cross section)
+     * Display a line on the image between (x1, y1) and (x2, y2)
+     * in image pixels. Backward compatibility: if only one arg y is passed,
+     * it displays a horizontal line at that y.
      */
-    image.setLine = function(y) {
+    image.setLine = function(x1, y1, x2, y2) {
 
       if (!image.lineEl) image.setupLine();
 
-      y -= 1; // off by one correction
-      y = y / image.height * 100; // convert to display scale
-
-      if (y > 20) {
-
-        image.lineEl.html('GRAPHED CROSS SECTION &nbsp;');
-        image.lineEl.css('margin-top', '-22px');
-
-      } else {
-
-        image.lineEl.html('');
-        image.lineEl.css('margin-top', '0');
-
+      if (arguments.length === 1) {
+        var y = x1;
+        x1 = 0;
+        y1 = y;
+        x2 = image.width;
+        y2 = y;
       }
 
-      image.lineEl.css('top', y);
+      image.currentCoords = { x1: x1, y1: y1, x2: x2, y2: y2 };
+
+      var displayX1 = (x1 / image.width) * 100 + '%',
+          displayY1 = (y1 / image.height) * 100,
+          displayX2 = (x2 / image.width) * 100 + '%',
+          displayY2 = (y2 / image.height) * 100;
+
+      image.lineEl.attr('x1', displayX1)
+                  .attr('y1', displayY1)
+                  .attr('x2', displayX2)
+                  .attr('y2', displayY2);
+
+      image.handle1.attr('cx', displayX1)
+                   .attr('cy', displayY1);
+      image.handle2.attr('cx', displayX2)
+                   .attr('cy', displayY2);
+
+      if (displayY1 > 20) {
+        image.lineTextEl.text('GRAPHED CROSS SECTION');
+        image.lineTextEl.attr('x', displayX2)
+                        .attr('y', displayY2)
+                        .attr('dy', -5);
+      } else {
+        image.lineTextEl.text('');
+      }
 
       return image.lineEl;
 
+    }
+
+
+    /* ======================================
+     * Show draggable handles for the cross section line
+     */
+    image.showHandles = function() {
+      if (!image.lineEl) image.setupLine();
+      image.handle1.show();
+      image.handle2.show();
+    }
+
+
+    /* ======================================
+     * Hide draggable handles for the cross section line
+     */
+    image.hideHandles = function() {
+      if (image.handle1) {
+        image.handle1.hide();
+        image.handle2.hide();
+      }
     }
 
 
@@ -340,8 +447,13 @@ SpectralWorkbench.Image = Class.extend({
       // we are getting aggressively empirical here and adding "_graph.extraPadding" to fix things
       // but essentially it seems there's a difference between reported d3 chart display width and actual 
       // measurable DOM width, so we adjust the displayed image with extraPadding.
+      var height = 100;
+      if (image.lineSvgEl && image.lineSvgEl.is(':visible')) height = 180; // keep height if handles are shown
+
       image.container.width(_graph.width)
-                            .height(100);
+                            .height(height);
+
+      if (image.lineSvgEl) image.lineSvgEl.height(height);
 
       if (!_graph.embed) image.container.css('margin-left',  _graph.margin.left);
       else               image.container.css('margin-left',  _graph.margin.left);
@@ -1399,9 +1511,10 @@ SpectralWorkbench.Spectrum = SpectralWorkbench.Datum.extend({
 
     /* ======================================
      * Overwrite spectrum.json.data.lines, the raw JSON of the spectrum
-     * <y> is the y-position of the cross section of pixels, where 0 is the top row
-     * <keepCalibrated> is a boolean which indicates whether to keep or flush the calibration
-     * <image> is a SpectralWorkbench.Image object, defaulting to spectrum.image
+     * <y> is the y-position of the cross section of pixels, where 0 is the top row.
+     * Alternatively, <y> can be an object with {x1, y1, x2, y2} for a custom line segment.
+     * <keepCalibrated> is a boolean which indicates whether to keep or flush the calibration.
+     * <image> is a SpectralWorkbench.Image object, defaulting to spectrum.image.
      */
     _spectrum.imgToJSON = function(y, keepCalibrated, image) {
 
@@ -1409,7 +1522,14 @@ SpectralWorkbench.Spectrum = SpectralWorkbench.Datum.extend({
 
       image = image || _spectrum.image;
 
-      image.getLine(y).forEach(function(pixel, index) {
+      var pixelData;
+      if (typeof y === 'object' && y !== null) {
+        pixelData = image.getLineData(y.x1, y.y1, y.x2, y.y2);
+      } else {
+        pixelData = image.getLine(y);
+      }
+
+      pixelData.forEach(function(pixel, index) {
 
         lines.push({
           'average': +((pixel[0] + pixel[1] + pixel[2]) / 3).toPrecision(_spectrum.sigFigIntensity),
@@ -3678,11 +3798,28 @@ SpectralWorkbench.API.Operations = {
 
     run: function(tag, callback) {
 
-      tag.datum.imgToJSON(tag.value);
+      var coords;
+      if (tag.value.indexOf(',') !== -1) {
+        var parts = tag.value.split(',');
+        coords = {
+          x1: parseFloat(parts[0]),
+          y1: parseFloat(parts[1]),
+          x2: parseFloat(parts[2]),
+          y2: parseFloat(parts[3])
+        };
+      } else {
+        coords = tag.value;
+      }
+
+      tag.datum.imgToJSON(coords);
       tag.datum.load(); // reparse graph-format data
 
       tag.datum.graph.args.sample_row = tag.value;
-      tag.datum.image.setLine(tag.value);
+      if (typeof coords === 'object') {
+        tag.datum.image.setLine(coords.x1, coords.y1, coords.x2, coords.y2);
+      } else {
+        tag.datum.image.setLine(coords);
+      }
 
       if (callback) callback(tag);
 
@@ -4344,30 +4481,51 @@ SpectralWorkbench.UI.ToolPaneTypes = {
       form.formEl.hide();
       form.el.find('.results').html('');
 
-      form.customFormEl.html("<p>Click the spectrum image or enter a row number:</p><input class='cross-section' type='text' value='0' />");
+      form.customFormEl.html("<p>Drag the endpoints to choose which row of pixels from the source image is used to generate your graph line:</p><input class='cross-section input-mini' type='text' value='0' />");
 
-      form.graph.datum.image.click(function(x, y, e) {
+      form.graph.datum.image.showHandles();
 
-        form.el.find('.cross-section').val(y);
+      form.graph.datum.image.onLineChange = function(coords) {
+        var val = Math.round(coords.x1) + ',' + Math.round(coords.y1) + ',' + Math.round(coords.x2) + ',' + Math.round(coords.y2);
+        form.el.find('.cross-section').val(val);
+      };
 
-        form.graph.datum.image.setLine(y);
+      // If it's a legacy single-value row, initialize handles to a horizontal line at that row
+      var currentVal = form.graph.args.sample_row;
+      if (currentVal && currentVal.indexOf(',') === -1) {
+        var y = parseFloat(currentVal);
+        form.graph.datum.image.setLine(0, y, form.graph.datum.image.width, y);
+      } else if (currentVal) {
+        var parts = currentVal.split(',');
+        form.graph.datum.image.setLine(parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+      }
 
-      });
+      var coords = form.graph.datum.image.currentCoords;
+      var val = Math.round(coords.x1) + ',' + Math.round(coords.y1) + ',' + Math.round(coords.x2) + ',' + Math.round(coords.y2);
+      form.el.find('.cross-section').val(val);
 
       // restore the existing sample row indicator
       // test this in jasmine!!!
-      form.closeEl.click(function() { form.graph.datum.image.setLine(form.graph.args.sample_row) });
+      form.closeEl.click(function() {
+        form.graph.datum.image.hideHandles();
+        form.graph.datum.image.setLine(form.graph.args.sample_row);
+      });
 
       form.customFormEl.find('input').on('change', function() {
-
-        form.graph.datum.image.setLine(form.customFormEl.find('input').val());
-
+        var val = $(this).val();
+        if (val.indexOf(',') !== -1) {
+          var parts = val.split(',');
+          form.graph.datum.image.setLine(parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+        } else {
+          form.graph.datum.image.setLine(parseFloat(val));
+        }
       });
 
     },
     onApply: function(form) {
 
       form.graph.dim();
+      form.graph.datum.image.hideHandles();
       form.graph.datum.addAndUploadTag('crossSection:' + $('.cross-section').val(), function() {
 
         form.graph.datum.load();

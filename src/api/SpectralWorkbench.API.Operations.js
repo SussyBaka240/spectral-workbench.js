@@ -128,11 +128,28 @@ SpectralWorkbench.API.Operations = {
 
     run: function(tag, callback) {
 
-      tag.datum.imgToJSON(tag.value);
+      var coords;
+      if (tag.value.indexOf(',') !== -1) {
+        var parts = tag.value.split(',');
+        coords = {
+          x1: parseFloat(parts[0]),
+          y1: parseFloat(parts[1]),
+          x2: parseFloat(parts[2]),
+          y2: parseFloat(parts[3])
+        };
+      } else {
+        coords = tag.value;
+      }
+
+      tag.datum.imgToJSON(coords);
       tag.datum.load(); // reparse graph-format data
 
       tag.datum.graph.args.sample_row = tag.value;
-      tag.datum.image.setLine(tag.value);
+      if (typeof coords === 'object') {
+        tag.datum.image.setLine(coords.x1, coords.y1, coords.x2, coords.y2);
+      } else {
+        tag.datum.image.setLine(coords);
+      }
 
       if (callback) callback(tag);
 

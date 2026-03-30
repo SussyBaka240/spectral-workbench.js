@@ -220,30 +220,51 @@ SpectralWorkbench.UI.ToolPaneTypes = {
       form.formEl.hide();
       form.el.find('.results').html('');
 
-      form.customFormEl.html("<p>Click the spectrum image or enter a row number:</p><input class='cross-section' type='text' value='0' />");
+      form.customFormEl.html("<p>Drag the endpoints to choose which row of pixels from the source image is used to generate your graph line:</p><input class='cross-section input-mini' type='text' value='0' />");
 
-      form.graph.datum.image.click(function(x, y, e) {
+      form.graph.datum.image.showHandles();
 
-        form.el.find('.cross-section').val(y);
+      form.graph.datum.image.onLineChange = function(coords) {
+        var val = Math.round(coords.x1) + ',' + Math.round(coords.y1) + ',' + Math.round(coords.x2) + ',' + Math.round(coords.y2);
+        form.el.find('.cross-section').val(val);
+      };
 
-        form.graph.datum.image.setLine(y);
+      // If it's a legacy single-value row, initialize handles to a horizontal line at that row
+      var currentVal = form.graph.args.sample_row;
+      if (currentVal && currentVal.indexOf(',') === -1) {
+        var y = parseFloat(currentVal);
+        form.graph.datum.image.setLine(0, y, form.graph.datum.image.width, y);
+      } else if (currentVal) {
+        var parts = currentVal.split(',');
+        form.graph.datum.image.setLine(parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+      }
 
-      });
+      var coords = form.graph.datum.image.currentCoords;
+      var val = Math.round(coords.x1) + ',' + Math.round(coords.y1) + ',' + Math.round(coords.x2) + ',' + Math.round(coords.y2);
+      form.el.find('.cross-section').val(val);
 
       // restore the existing sample row indicator
       // test this in jasmine!!!
-      form.closeEl.click(function() { form.graph.datum.image.setLine(form.graph.args.sample_row) });
+      form.closeEl.click(function() {
+        form.graph.datum.image.hideHandles();
+        form.graph.datum.image.setLine(form.graph.args.sample_row);
+      });
 
       form.customFormEl.find('input').on('change', function() {
-
-        form.graph.datum.image.setLine(form.customFormEl.find('input').val());
-
+        var val = $(this).val();
+        if (val.indexOf(',') !== -1) {
+          var parts = val.split(',');
+          form.graph.datum.image.setLine(parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+        } else {
+          form.graph.datum.image.setLine(parseFloat(val));
+        }
       });
 
     },
     onApply: function(form) {
 
       form.graph.dim();
+      form.graph.datum.image.hideHandles();
       form.graph.datum.addAndUploadTag('crossSection:' + $('.cross-section').val(), function() {
 
         form.graph.datum.load();
