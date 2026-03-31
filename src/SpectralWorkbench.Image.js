@@ -97,22 +97,48 @@ SpectralWorkbench.Image = Class.extend({
         x2 = image.width;
       }
 
-      var output = [];
       var dx = x2 - x1;
       var dy = y2 - y1;
-      var distance = Math.sqrt(dx*dx + dy*dy);
-      var steps = Math.round(distance);
+      var steps = Math.ceil(Math.sqrt(dx * dx + dy * dy));
 
-      for (var i = 0; i < steps; i++) {
-        var x = Math.round(x1 + (dx * i / steps));
-        var y = Math.round(y1 + (dy * i / steps));
-        // Ensure within bounds
-        x = Math.max(0, Math.min(image.width - 1, x));
-        y = Math.max(0, Math.min(image.height - 1, y));
-        output.push(image.getPoint(x, y));
+      if (steps === 0) return [image.getPoint(x1, y1)];
+
+      var minX = Math.floor(Math.min(x1, x2));
+      var minY = Math.floor(Math.min(y1, y2));
+      var maxX = Math.ceil(Math.max(x1, x2));
+      var maxY = Math.ceil(Math.max(y1, y2));
+
+      // Ensure bounds
+      minX = Math.max(0, Math.min(image.width - 1, minX));
+      minY = Math.max(0, Math.min(image.height - 1, minY));
+      maxX = Math.max(0, Math.min(image.width - 1, maxX));
+      maxY = Math.max(0, Math.min(image.height - 1, maxY));
+
+      var width = maxX - minX + 1;
+      var height = maxY - minY + 1;
+
+      var imageData = image.ctx.getImageData(minX, minY, width, height).data;
+      var points = [];
+
+      for (var i = 0; i <= steps; i++) {
+        var t = i / steps;
+        var px = Math.round(x1 + dx * t) - minX;
+        var py = Math.round(y1 + dy * t) - minY;
+
+        // Ensure px, py are within the imageData bounds
+        px = Math.max(0, Math.min(width - 1, px));
+        py = Math.max(0, Math.min(height - 1, py));
+
+        var offset = (py * width + px) * 4;
+        points.push([
+          imageData[offset],
+          imageData[offset + 1],
+          imageData[offset + 2],
+          imageData[offset + 3]
+        ]);
       }
 
-      return output;
+      return points;
 
     }
 
@@ -124,19 +150,15 @@ SpectralWorkbench.Image = Class.extend({
 
       if (_graph && !image.svg) {
 
-        image.el.before($('<div class="section-line-container"></div>'));
-        image.lineContainerEl = image.container.find('.section-line-container');
-        image.lineContainerEl.css('position', 'relative')
-                             .css('width', '100%')
-                             .css('height', 0);
+        image.container.css('position', 'relative');
 
-        image.svg = d3.select(image.lineContainerEl[0])
+        image.svg = d3.select(image.container[0])
           .append('svg:svg')
           .style('position', 'absolute')
           .style('top', 0)
           .style('left', 0)
           .style('width', '100%')
-          .style('height', '100px')
+          .style('height', '100%')
           .style('pointer-events', 'none')
           .attr('class', 'sampling-line-overlay');
 
@@ -296,6 +318,7 @@ SpectralWorkbench.Image = Class.extend({
       if (image.svg) {
 
         image.svg.attr('width', image.el.width())
+                 .attr('height', image.el.height())
                  .css('margin-left', image.el.css('margin-left'));
 
         if (image.coords) {

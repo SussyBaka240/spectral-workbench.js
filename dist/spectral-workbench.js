@@ -236,22 +236,48 @@ SpectralWorkbench.Image = Class.extend({
         x2 = image.width;
       }
 
-      var output = [];
       var dx = x2 - x1;
       var dy = y2 - y1;
-      var distance = Math.sqrt(dx*dx + dy*dy);
-      var steps = Math.round(distance);
+      var steps = Math.ceil(Math.sqrt(dx * dx + dy * dy));
 
-      for (var i = 0; i < steps; i++) {
-        var x = Math.round(x1 + (dx * i / steps));
-        var y = Math.round(y1 + (dy * i / steps));
-        // Ensure within bounds
-        x = Math.max(0, Math.min(image.width - 1, x));
-        y = Math.max(0, Math.min(image.height - 1, y));
-        output.push(image.getPoint(x, y));
+      if (steps === 0) return [image.getPoint(x1, y1)];
+
+      var minX = Math.floor(Math.min(x1, x2));
+      var minY = Math.floor(Math.min(y1, y2));
+      var maxX = Math.ceil(Math.max(x1, x2));
+      var maxY = Math.ceil(Math.max(y1, y2));
+
+      // Ensure bounds
+      minX = Math.max(0, Math.min(image.width - 1, minX));
+      minY = Math.max(0, Math.min(image.height - 1, minY));
+      maxX = Math.max(0, Math.min(image.width - 1, maxX));
+      maxY = Math.max(0, Math.min(image.height - 1, maxY));
+
+      var width = maxX - minX + 1;
+      var height = maxY - minY + 1;
+
+      var imageData = image.ctx.getImageData(minX, minY, width, height).data;
+      var points = [];
+
+      for (var i = 0; i <= steps; i++) {
+        var t = i / steps;
+        var px = Math.round(x1 + dx * t) - minX;
+        var py = Math.round(y1 + dy * t) - minY;
+
+        // Ensure px, py are within the imageData bounds
+        px = Math.max(0, Math.min(width - 1, px));
+        py = Math.max(0, Math.min(height - 1, py));
+
+        var offset = (py * width + px) * 4;
+        points.push([
+          imageData[offset],
+          imageData[offset + 1],
+          imageData[offset + 2],
+          imageData[offset + 3]
+        ]);
       }
 
-      return output;
+      return points;
 
     }
 
@@ -275,7 +301,7 @@ SpectralWorkbench.Image = Class.extend({
           .style('top', 0)
           .style('left', 0)
           .style('width', '100%')
-          .style('height', '100px')
+          .style('height', '100%')
           .style('pointer-events', 'none')
           .attr('class', 'sampling-line-overlay');
 
@@ -4413,10 +4439,14 @@ SpectralWorkbench.UI.ToolPaneTypes = {
     link: "//publiclab.org/wiki/spectral-workbench-operations#crossSection",
     apply: true,
     author: "warren",
+    cleanUp: function(form) {
+      form.graph.datum.image.clickOff();
+    },
     setup: function(form) {
 
       form.formEl.hide();
       form.el.find('.results').html('');
+      form.graph.datum.image.clickOff();
 
       form.customFormEl.html("<p>Click twice to set the sampling line:</p><input class='cross-section' type='text' value='0' />");
 
@@ -4452,8 +4482,8 @@ SpectralWorkbench.UI.ToolPaneTypes = {
           var coords = form.graph.datum.image.coords;
 
           // Convert display px to image px
-          var newX = form.graph.datum.displayPxToImagePx(d3.event.x);
-          var newY = (d3.event.y / 100) * form.graph.datum.image.height;
+          var newX = form.graph.displayPxToImagePx(d3.event.x);
+          var newY = (d3.event.y / form.graph.datum.image.el.height()) * form.graph.datum.image.height;
 
           if (isHandle1) {
             coords.x1 = newX;
@@ -4468,6 +4498,8 @@ SpectralWorkbench.UI.ToolPaneTypes = {
 
         });
 
+        form.graph.datum.image.handle1.on('.drag', null);
+        form.graph.datum.image.handle2.on('.drag', null);
         form.graph.datum.image.handle1.call(drag);
         form.graph.datum.image.handle2.call(drag);
 

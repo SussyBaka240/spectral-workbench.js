@@ -193,17 +193,16 @@
           <!-- Upload Card -->
           <div class="upload-card">
             <h4><i class="fa fa-upload"></i> Upload an Image</h4>
-            <p>Analyze a spectrum from your own image file (JPEG/PNG). Click on the preview to set the sample row (yellow bar).</p>
+            <p>Analyze a spectrum from your own image file (JPEG/PNG). Click twice on the image to define a sampling line.</p>
             <input type="file" id="spectrumImageUpload" accept="image/jpeg,image/png" style="display:none;">
             <button class="btn btn-spectrum" id="triggerUploadBtn"><i class="fa fa-folder-open"></i> Choose Image</button>
             <button class="btn btn-spectrum" id="processUploadedBtn" disabled><i class="fa fa-chart-line"></i> Extract & Plot</button>
             <span id="uploadFileName" style="margin-left:10px;"></span>
             <div id="uploadPreviewContainer" class="upload-preview-area" style="display:none;">
-              <div style="position:relative; display:inline-block;">
-                <canvas id="uploadPreviewCanvas" class="upload-preview-canvas" width="640" height="200"></canvas>
-                <div id="rowGuide" class="row-highlight" style="display:none;"></div>
+              <div class="swb-spectrum-img-container" style="position:relative; display:inline-block;">
+                <img id="uploadPreviewImage" class="upload-preview-canvas" style="display:block; max-width:640px;">
               </div>
-              <p class="text-muted" style="margin-top:5px;">Click on the image to place the sampling row (yellow line).</p>
+              <p class="text-muted" style="margin-top:5px;">Click twice to set the sampling line. Drag the endpoints to adjust.</p>
               <div id="rowCoordDisplay"></div>
             </div>
           </div>
@@ -351,11 +350,10 @@
             <span id="calibFileName" style="margin-left:10px;"></span>
 
             <div id="calibPreviewContainer" class="upload-preview-area" style="display:none; position: relative;">
-              <div style="position:relative; display:inline-block;">
-                <canvas id="calibPreviewCanvas" class="upload-preview-canvas" width="640" height="200"></canvas>
-                <div id="calibRowGuide" class="row-highlight" style="display:none;"></div>
+              <div class="swb-calib-img-container" style="position:relative; display:inline-block;">
+                <img id="calibPreviewImage" class="upload-preview-canvas" style="display:block; max-width:640px;">
               </div>
-              <p class="text-muted" style="margin-top:5px;">Click on the image to set the sampling row for calibration.</p>
+              <p class="text-muted" style="margin-top:5px;">Click twice on the image to set the sampling line for calibration.</p>
             </div>
           </div>
 
@@ -555,15 +553,13 @@
       }
     });
 
-    // ----- Image Upload Module (already working) -----
+    // ----- Image Upload Module -----
     let currentImage = null;
-    let selectedRow = null;
-    let previewCanvas = document.getElementById('uploadPreviewCanvas');
-    let ctx = previewCanvas.getContext('2d');
+    let selectedCoords = null;
     let uploadContainer = document.getElementById('uploadPreviewContainer');
-    let rowGuide = document.getElementById('rowGuide');
     let processBtn = document.getElementById('processUploadedBtn');
     let fileNameSpan = document.getElementById('uploadFileName');
+    let swbImage = null;
 
     $('#triggerUploadBtn').click(() => $('#spectrumImageUpload').click());
 
@@ -573,83 +569,79 @@
       fileNameSpan.innerText = file.name;
       let reader = new FileReader();
       reader.onload = (ev) => {
-        let img = new Image();
-        img.onload = () => {
-          currentImage = img;
-          let displayWidth = Math.min(640, img.width);
-          let displayHeight = (displayWidth / img.width) * img.height;
-          previewCanvas.width = displayWidth;
-          previewCanvas.height = displayHeight;
-          ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
-          uploadContainer.style.display = 'block';
-          selectedRow = null;
-          rowGuide.style.display = 'none';
-          processBtn.disabled = true;
-          $('#rowCoordDisplay').html('Click on the image to set sample row');
-          // Click handler for row selection
-          $(previewCanvas).off('click').on('click', function(event) {
-            let rect = previewCanvas.getBoundingClientRect();
-            let scaleY = previewCanvas.height / rect.height;
-            let mouseY = (event.clientY - rect.top) * scaleY;
-            selectedRow = Math.min(Math.max(Math.floor(mouseY), 0), previewCanvas.height - 1);
-            let yPercent = (selectedRow / previewCanvas.height) * 100;
-            rowGuide.style.display = 'block';
-            rowGuide.style.top = `calc(${yPercent}% + ${previewCanvas.offsetTop}px)`;
-            rowGuide.style.width = `${previewCanvas.clientWidth}px`;
-            $('#rowCoordDisplay').html(`<i class="fa fa-chart-line"></i> Row Y = ${selectedRow} (display pixels). Ready to extract.`);
-            processBtn.disabled = false;
-            // Redraw image and highlight row
-            ctx.drawImage(img, 0, 0, previewCanvas.width, previewCanvas.height);
-            ctx.beginPath();
-            ctx.moveTo(0, selectedRow);
-            ctx.lineTo(previewCanvas.width, selectedRow);
-            ctx.strokeStyle = '#ffcc00';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          });
-        };
-        img.src = ev.target.result;
+        $('.swb-spectrum-img-container .section-line-container').remove();
+        $('#uploadPreviewImage').attr('src', ev.target.result);
+        uploadContainer.style.display = 'block';
+        processBtn.disabled = true;
+        $('#rowCoordDisplay').html('Click twice to set the sampling line');
+
+        // Initialize SpectralWorkbench.Image
+        var mockGraph = { width: 640, height: 200, margin: { left: 0 } };
+        swbImage = new SpectralWorkbench.Image(mockGraph, {
+          selector: '.swb-spectrum-img-container',
+          onLoad: function() {
+            // Add two-click handler manually since it's not a full tool pane
+            var firstClick = true;
+            var x1, y1, x2, y2;
+            swbImage.click(function(x, y) {
+              if (firstClick) {
+                x1 = x; y1 = y;
+                firstClick = false;
+              } else {
+                x2 = x; y2 = y;
+                swbImage.setLine(x1, y1, x2, y2);
+                selectedCoords = { x1: x1, y1: y1, x2: x2, y2: y2 };
+                $('#rowCoordDisplay').html(`<i class="fa fa-chart-line"></i> Line: (${Math.round(x1)},${Math.round(y1)}) to (${Math.round(x2)},${Math.round(y2)})`);
+                processBtn.disabled = false;
+                firstClick = true;
+
+                // Add draggability
+                var drag = d3.behavior.drag();
+                drag.on('drag', function() {
+                  var isHandle1 = d3.select(this).node() === swbImage.handle1.node();
+                  var newX = (d3.event.x / swbImage.el.width()) * swbImage.width;
+                  var newY = (d3.event.y / swbImage.el.height()) * swbImage.height;
+                  if (isHandle1) {
+                    selectedCoords.x1 = newX;
+                    selectedCoords.y1 = newY;
+                  } else {
+                    selectedCoords.x2 = newX;
+                    selectedCoords.y2 = newY;
+                  }
+                  swbImage.setLine(selectedCoords.x1, selectedCoords.y1, selectedCoords.x2, selectedCoords.y2);
+                  $('#rowCoordDisplay').html(`<i class="fa fa-chart-line"></i> Line: (${Math.round(selectedCoords.x1)},${Math.round(selectedCoords.y1)}) to (${Math.round(selectedCoords.x2)},${Math.round(selectedCoords.y2)})`);
+                });
+                swbImage.handle1.on('.drag', null).call(drag);
+                swbImage.handle2.on('.drag', null).call(drag);
+              }
+            });
+          }
+        });
       };
       reader.readAsDataURL(file);
     });
 
     processBtn.addEventListener('click', () => {
-      if (!currentImage || selectedRow === null) {
-        alert('Please select a row by clicking on the image.');
-        return;
-      }
-      // Extract RGB data from the selected row (using original image dimensions)
-      let offCanvas = document.createElement('canvas');
-      offCanvas.width = currentImage.width;
-      offCanvas.height = currentImage.height;
-      let offCtx = offCanvas.getContext('2d');
-      offCtx.drawImage(currentImage, 0, 0);
-      let scaleY = currentImage.height / previewCanvas.height;
-      let originalRow = Math.floor(selectedRow * scaleY);
-      originalRow = Math.min(originalRow, currentImage.height - 1);
-      let pixels = [];
-      for (let x = 0; x < currentImage.width; x++) {
-        let pixel = offCtx.getImageData(x, originalRow, 1, 1).data;
-        pixels.push({ r: pixel[0], g: pixel[1], b: pixel[2] });
-      }
+      if (!swbImage || !selectedCoords) return;
+
+      let pixels = swbImage.getLine(selectedCoords.x1, selectedCoords.y1, selectedCoords.x2, selectedCoords.y2);
+      let formattedPixels = pixels.map(p => ({ r: p[0], g: p[1], b: p[2] }));
 
       stepper.to(4);
       $("#capture-trigger, #setting-trigger, #landing-page-trigger").prop('disabled', true);
-      initializeFinalPlot(pixels);
+      initializeFinalPlot(formattedPixels);
     });
 
     // ----- Calibration Module -----
     window.calibVars = {
       calibImage: null,
-      calibSelectedRow: null,
+      calibSelectedCoords: null,
       p1: { x: null, nm: null },
       p2: { x: null, nm: null }
     };
-    let calibPreviewCanvas = document.getElementById('calibPreviewCanvas');
-    let calibCtx = calibPreviewCanvas.getContext('2d');
     let calibUploadContainer = document.getElementById('calibPreviewContainer');
-    let calibRowGuide = document.getElementById('calibRowGuide');
     let calibFileNameSpan = document.getElementById('calibFileName');
+    let swbCalibImage = null;
 
     $('#triggerCalibUploadBtn').click(() => $('#calibImageUpload').click());
 
@@ -659,56 +651,61 @@
       calibFileNameSpan.innerText = file.name;
       let reader = new FileReader();
       reader.onload = (ev) => {
-        let img = new Image();
-        img.onload = () => {
-          window.calibVars.calibImage = img;
-          let displayWidth = Math.min(640, img.width);
-          let displayHeight = (displayWidth / img.width) * img.height;
-          calibPreviewCanvas.width = displayWidth;
-          calibPreviewCanvas.height = displayHeight;
-          calibCtx.drawImage(img, 0, 0, displayWidth, displayHeight);
-          calibUploadContainer.style.display = 'block';
-          window.calibVars.calibSelectedRow = null;
-          calibRowGuide.style.display = 'none';
-          $('#calibGraphSection').hide();
+        $('.swb-calib-img-container .section-line-container').remove();
+        $('#calibPreviewImage').attr('src', ev.target.result);
+        calibUploadContainer.style.display = 'block';
+        $('#calibGraphSection').hide();
 
-          $(calibPreviewCanvas).off('click').on('click', function(event) {
-            let rect = calibPreviewCanvas.getBoundingClientRect();
-            let scaleY = calibPreviewCanvas.height / rect.height;
-            let mouseY = (event.clientY - rect.top) * scaleY;
-            window.calibVars.calibSelectedRow = Math.min(Math.max(Math.floor(mouseY), 0), calibPreviewCanvas.height - 1);
-            let yPercent = (window.calibVars.calibSelectedRow / calibPreviewCanvas.height) * 100;
-            calibRowGuide.style.display = 'block';
-            calibRowGuide.style.top = `calc(${yPercent}% + ${calibPreviewCanvas.offsetTop}px)`;
-            calibRowGuide.style.width = `${calibPreviewCanvas.clientWidth}px`;
+        var mockGraph = { width: 640, height: 200, margin: { left: 0 } };
+        swbCalibImage = new SpectralWorkbench.Image(mockGraph, {
+          selector: '.swb-calib-img-container',
+          onLoad: function() {
+            var firstClick = true;
+            var x1, y1, x2, y2;
+            swbCalibImage.click(function(x, y) {
+              if (firstClick) {
+                x1 = x; y1 = y;
+                firstClick = false;
+              } else {
+                x2 = x; y2 = y;
+                swbCalibImage.setLine(x1, y1, x2, y2);
+                window.calibVars.calibSelectedCoords = { x1: x1, y1: y1, x2: x2, y2: y2 };
+                extractCalibrationSpectrum();
+                firstClick = true;
 
-            extractCalibrationSpectrum();
-          });
-        };
-        img.src = ev.target.result;
+                // Add draggability
+                var drag = d3.behavior.drag();
+                drag.on('drag', function() {
+                  var isHandle1 = d3.select(this).node() === swbCalibImage.handle1.node();
+                  var newX = (d3.event.x / swbCalibImage.el.width()) * swbCalibImage.width;
+                  var newY = (d3.event.y / swbCalibImage.el.height()) * swbCalibImage.height;
+                  if (isHandle1) {
+                    window.calibVars.calibSelectedCoords.x1 = newX;
+                    window.calibVars.calibSelectedCoords.y1 = newY;
+                  } else {
+                    window.calibVars.calibSelectedCoords.x2 = newX;
+                    window.calibVars.calibSelectedCoords.y2 = newY;
+                  }
+                  swbCalibImage.setLine(window.calibVars.calibSelectedCoords.x1, window.calibVars.calibSelectedCoords.y1, window.calibVars.calibSelectedCoords.x2, window.calibVars.calibSelectedCoords.y2);
+                  extractCalibrationSpectrum();
+                });
+                swbCalibImage.handle1.on('.drag', null).call(drag);
+                swbCalibImage.handle2.on('.drag', null).call(drag);
+              }
+            });
+          }
+        });
       };
       reader.readAsDataURL(file);
     });
 
     function extractCalibrationSpectrum() {
-      if (!window.calibVars.calibImage || window.calibVars.calibSelectedRow === null) return;
+      if (!swbCalibImage || !window.calibVars.calibSelectedCoords) return;
 
-      let offCanvas = document.createElement('canvas');
-      offCanvas.width = window.calibVars.calibImage.width;
-      offCanvas.height = window.calibVars.calibImage.height;
-      let offCtx = offCanvas.getContext('2d');
-      offCtx.drawImage(window.calibVars.calibImage, 0, 0);
-      let scaleY = window.calibVars.calibImage.height / calibPreviewCanvas.height;
-      let originalRow = Math.floor(window.calibVars.calibSelectedRow * scaleY);
-      originalRow = Math.min(originalRow, window.calibVars.calibImage.height - 1);
+      let pixels = swbCalibImage.getLine(window.calibVars.calibSelectedCoords.x1, window.calibVars.calibSelectedCoords.y1, window.calibVars.calibSelectedCoords.x2, window.calibVars.calibSelectedCoords.y2);
+      let formattedPixels = pixels.map(p => ({ r: p[0], g: p[1], b: p[2] }));
 
-      let pixels = [];
-      for (let x = 0; x < window.calibVars.calibImage.width; x++) {
-        let pixel = offCtx.getImageData(x, originalRow, 1, 1).data;
-        pixels.push({ r: pixel[0], g: pixel[1], b: pixel[2] });
-      }
-
-      let spectrum = createRGBSpectrum(pixels);
+      let spectrum = createRGBSpectrum(formattedPixels);
       $('#calibGraphSection').show();
       $('#calibGraph').empty();
 

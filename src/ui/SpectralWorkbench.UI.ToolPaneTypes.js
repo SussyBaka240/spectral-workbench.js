@@ -214,10 +214,14 @@ SpectralWorkbench.UI.ToolPaneTypes = {
     link: "//publiclab.org/wiki/spectral-workbench-operations#crossSection",
     apply: true,
     author: "warren",
+    cleanUp: function(form) {
+      form.graph.datum.image.clickOff();
+    },
     setup: function(form) {
 
       form.formEl.hide();
       form.el.find('.results').html('');
+      form.graph.datum.image.clickOff();
 
       form.customFormEl.html("<p>Click twice to set the sampling line:</p><input class='cross-section' type='text' value='0' />");
 
@@ -253,7 +257,7 @@ SpectralWorkbench.UI.ToolPaneTypes = {
           var coords = form.graph.datum.image.coords;
 
           // Convert display px to image px
-          var newX = form.graph.datum.displayPxToImagePx(d3.event.x);
+          var newX = form.graph.displayPxToImagePx(d3.event.x);
           var newY = (d3.event.y / form.graph.datum.image.el.height()) * form.graph.datum.image.height;
 
           if (isHandle1) {
